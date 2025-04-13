@@ -1,0 +1,395 @@
+<html>
+
+<head>
+    <script src='https://sdk-cdn.mypurecloud.com/javascript/27.0.0/purecloud-platform-client-v2.min.js'></script>
+</head>
+
+<body>
+    <h2>ERS Team Members</h2>
+    <h3>Current Assignment</h3>
+    <p id="currentAssignment">Loading current assignment...</p>
+
+    <h3>Assign Primary & Secondary Agents</h3>
+   <label for="primarySelect">Primary:</label>
+   <select id="primarySelect"></select>
+
+   <label for="secondarySelect">Secondary:</label>
+   <select id="secondarySelect"></select>
+
+   <br><br>
+   <!-- 🔘 The Button -->
+   <button onclick="getSelectedAgents()">Submit Assignment</button>
+
+   <p id="selectedOutput"></p> <!-- Optional: for showing result -->
+   <table border="1">
+       <thead>
+       <tr>
+           <th>Agent Name</th>
+           <th>Mobile Phone</th>
+           <th>Home Phone</th>
+           <th>Work Phone</th>
+       </tr>
+       </thead>
+       <tbody id="agentTableBody"></tbody>
+   </table>
+</body>
+</html>
+
+<script>
+    const clientId ='0e59bf36-3a6f-408c-8215-49654bb0bafa';
+    const redirectUri = 'http://127.0.0.1:5500/ERSRoster.html';
+    let environment = 'mypurecloud.com.au';
+
+    // Set Genesys Cloud objects
+    const platformClient = require('platformClient');
+    const client = platformClient.ApiClient.instance;
+    const groupName = 'ERS';
+    let organizationApi = new platformClient.OrganizationApi();
+    let cachedTableId = null; 
+    const tableName = 'ERS_Agent_Assignment'; // Your table name here
+
+    client.setEnvironment(environment);
+
+    //document.addEventListener('DOMContentLoaded', function () {
+     //   client.loginImplicitGrant(clientId, redirectUri)
+     //       .then(() => {
+     //           organizationApi.getOrganizationsMe()
+    //                .then((data) => {
+    //                    populateParagraph(data)
+    //                })
+   //                 .catch((err) => {
+     //                   console.log('There was a failure calling getOrganizationsMe');
+     //                   console.error(err);
+     //               });
+    //        })
+    //});
+
+    function populateParagraph(data) {
+        for (key in data) {
+            console.log(key, data[key]);
+            let textnode = document.createTextNode(key + ' : ' + data[key]);
+            let br = document.createElement("br")
+            document.getElementById("orgDetails").appendChild(textnode);
+            document.getElementById("orgDetails").appendChild(br);
+        }
+    }
+    async function getCurrentAssignment(tableId) {
+        try {
+            console.log("Executing getFullRow...............");
+
+            const assignment = await getFullRowWithFetch(tableId, 'ERS');  // manual fetch function you implemented
+            console.log("assignment:", assignment);
+            console.log("primaryId:", assignment.primaryId);
+            console.log("secondaryId:", assignment.secondaryId);
+
+            return assignment;
+        } catch (err) {
+            console.error("Error in getCurrentAssignment:", err);
+            return null;
+        }
+    }
+
+    function getSelectedAgents() {
+        const primarySelect = document.getElementById('primarySelect');
+        const secondarySelect = document.getElementById('secondarySelect');
+
+        const primaryId = primarySelect?.value;
+        const secondaryId = secondarySelect?.value;
+
+        console.log('Selected Primary:', primaryId);
+        console.log('Selected Secondary:', secondaryId);
+
+        // Optional: show names
+        const primaryName = document.getElementById('primarySelect').selectedOptions[0].text;
+        const secondaryName = document.getElementById('secondarySelect').selectedOptions[0].text;
+        document.getElementById('selectedOutput').innerText = 
+            `Primary: ${primaryName} | Secondary: ${secondaryName}`;
+
+        saveAssignmentToDataTable(primaryId, secondaryId);
+    }
+
+    async function getFullRow(tableId, rowId) {
+        const client = platformClient.ApiClient.instance;
+
+        try {
+            // Ensure auth is applied manually
+            const opts = {
+                pathParams: {
+                    datatableId: tableId,
+                    rowId: rowId
+                },
+                queryParams: {
+                    showbrief: false
+                },
+                headerParams: {},
+                formParams: {},
+                bodyParam: null,
+                authNames: ['PureCloud Auth'], // FIXED HERE
+                contentTypes: [],
+                accepts: ['application/json']
+            };
+
+            console.log("Access Token:", client.authData.accessToken);
+                
+            const response = await client.callApi(
+                '/api/v2/flows/datatables/{datatableId}/rows/{rowId}',
+                'GET',
+                opts.pathParams,
+                opts.queryParams,
+                opts.headerParams,
+                opts.formParams,
+                opts.bodyParam,
+                opts.authNames,
+                opts.contentTypes,
+                opts.accepts
+                );
+
+                console.log("✅ Full row response:", response);
+            return response;
+        } catch (err) {
+            console.error("Error fetching full row:", err);
+        return null;
+    }
+    }
+
+    async function getFullRowWithFetch(tableId, rowId) {
+        const token = platformClient.ApiClient.instance.authData.accessToken;
+
+        const url = `https://api.mypurecloud.com.au/api/v2/flows/datatables/${tableId}/rows/${rowId}?showbrief=false`;
+
+        const response = await fetch(url, {
+            headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`Fetch failed: ${response.status} ${response.statusText} — ${error}`);
+        }
+
+        const data = await response.json();
+        console.log("✅ Full row via fetch():", data);
+        return data;
+    }
+
+    async function authenticate() {
+        client.setEnvironment('mypurecloud.com.au'); // or .com / .ie etc.
+        await client.loginImplicitGrant(clientId, redirectUri);
+        console.log('Authenticated');
+        const api = new platformClient.ArchitectApi();
+        const tableId = '2127052b-afb7-47ac-b274-467a6377c4e0'; // replace with your real table ID
+
+        api.getFlowsDatatableRow(tableId, 'ERS').then(row => {
+            console.log("Full ERS row:", row);
+        });
+
+        await loadRaiseTeam(tableId);
+        await listDataTables();
+    }
+   
+    async function loadRaiseTeam(tableId) {
+        const groupsApi = new platformClient.GroupsApi();
+        const usersApi = new platformClient.UsersApi();
+
+        // Step 1: Find the ERS group
+        const groupSearch = await groupsApi.getGroups({ name: groupName });
+        const raiseGroup = groupSearch.entities.find(g => g.name === groupName);
+        if (!raiseGroup) {
+            alert('RAISE group not found');
+            return;
+        }
+        // Step 2: Get group members
+        const members = await groupsApi.getGroupMembers(raiseGroup.id);
+        console.log('Table element:', document.getElementById('agentTableBody'));
+        let tbody = document.getElementById('agentTableBody');
+        tbody.innerHTML = ''; // clear previous rows
+
+        const primaryDropdown = document.getElementById('primarySelect');
+        const secondaryDropdown = document.getElementById('secondarySelect');
+        
+        // Clear any previous options
+        primaryDropdown.innerHTML = '';
+        secondaryDropdown.innerHTML = '';
+
+        const agentMap = {}; // id => name map
+
+        console.log(`Members in group: ${members.entities.length}`);
+        // Step 3: Fetch and display each agent's contact info
+        for (const member of members.entities) {
+            const user = await usersApi.getUser(member.id);
+            agentMap[user.id] = user.name;
+
+            const cell = user.addresses?.find(a => a.type === 'MOBILE' && a.mediaType === 'PHONE')?.address || '';
+            const home = user.addresses?.find(a => a.type === 'HOME' && a.mediaType === 'PHONE')?.address || '';
+            const work = user.addresses?.find(a => a.type === 'WORK' && a.mediaType === 'PHONE')?.address || '';
+
+            // Add agent to dropdowns
+            const option1 = new Option(user.name, user.id);
+            const option2 = new Option(user.name, user.id);
+            primaryDropdown.add(option1);
+            secondaryDropdown.add(option2);
+            
+            setupDropdownLogic();
+
+            console.log('Work Phone:', work);
+            console.log('Cell Phone:', cell);
+            console.log('Home Phone:', home);
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${user.name}</td>
+                <td>${cell}</td>
+                <td>${home}</td>
+                <td>${work}</td>
+                `;
+            tbody.appendChild(row); // inside the loop
+        }
+        console.log("Full agent map:", agentMap);
+
+        const assignment = await getCurrentAssignment(tableId);
+        if (assignment?.primaryId && assignment?.secondaryId) {
+            document.getElementById('primarySelect').value = assignment.primaryId;
+            document.getElementById('secondarySelect').value = assignment.secondaryId;
+
+            const primaryName = agentMap[assignment.primaryId] || `ID: ${assignment.primaryId}`;
+            const secondaryName = agentMap[assignment.secondaryId] || `ID: ${assignment.secondaryId}`;
+
+            document.getElementById('currentAssignment').innerText =
+            `Primary: ${primaryName} | Secondary: ${secondaryName}`;
+        } 
+        else {
+            document.getElementById('currentAssignment').innerText = 'No current assignment found in Data Table.';
+        }
+    }
+    function setupDropdownLogic() {
+        const primarySelect = document.getElementById('primarySelect');
+        const secondarySelect = document.getElementById('secondarySelect');
+
+        primarySelect.addEventListener('change', () => {
+            const selectedPrimary = primarySelect.value;
+            Array.from(secondarySelect.options).forEach(option => {
+            option.disabled = option.value === selectedPrimary;
+            });
+        });
+
+        secondarySelect.addEventListener('change', () => {
+            const selectedSecondary = secondarySelect.value;
+            Array.from(primarySelect.options).forEach(option => {
+            option.disabled = option.value === selectedSecondary;
+            });
+        });
+
+        // Trigger once if values are already set
+        primarySelect.dispatchEvent(new Event('change'));
+        secondarySelect.dispatchEvent(new Event('change'));
+    }
+
+    function getSelectedAgents() {
+       const primaryId = document.getElementById('primarySelect').value;
+       const secondaryId = document.getElementById('secondarySelect').value;
+
+       console.log('Selected Primary:', primaryId);
+       console.log('Selected Secondary:', secondaryId);
+
+       // Optional: Display on page
+       const primaryName = document.getElementById('primarySelect').selectedOptions[0].text;
+       const secondaryName = document.getElementById('secondarySelect').selectedOptions[0].text;
+       document.getElementById('selectedOutput').innerText = `Primary: ${primaryName} | Secondary: ${secondaryName}`;
+
+       // You can now use these to fetch numbers, store in data table, etc.
+       // Save to Genesys Cloud Data Table
+
+       saveAssignmentToDataTable(primaryId, secondaryId);
+    }
+    
+    async function getTableIdByName(tableName) {
+       if (cachedTableId) {
+           return cachedTableId; // return the cached ID if we already found it
+       }
+       const architectApi = new platformClient.ArchitectApi();
+
+       try {
+           const response = await architectApi.getFlowsDatatables({ pageSize: 100 });
+           const match = response.entities.find(table => table.name === tableName);
+
+           if (match) {
+               console.log(`Found table "${tableName}" → ID: ${match.id}`);
+               cachedTableId = match.id; // cache it for future use
+               return cachedTableId;
+           } 
+           else {
+               console.error(`Table "${tableName}" not found.`);
+               return null;
+           }
+       } 
+       catch (error) {
+           console.error('Error retrieving table list:', error);
+           return null;
+       }
+    }
+   
+   async function saveAssignmentToDataTable(primaryId, secondaryId) {
+       const architectApi = new platformClient.ArchitectApi();
+       //const tableName = 'ERS_Agent_Assignment'; // Your table name here
+       const tables = await architectApi.getFlowsDatatables();  // paged list
+       console.log(tables);
+
+       const tableId = await getTableIdByName(tableName); //'2127052b-afb7-47ac-b274-467a6377c4e0';
+       
+       const rowId = 'ERS'; // Fixed key, or make it dynamic if needed
+
+       const row = {
+           key: rowId, // must match the key column name
+           primaryId: primaryId,
+           secondaryId: secondaryId,
+           timestamp: new Date().toLocaleString('en-AU', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            }
+           )
+       };
+
+       console.log('Sending row:', JSON.stringify(row, null, 2));
+
+       try {
+           await architectApi.deleteFlowsDatatableRow(tableId, "ERS");
+           // Save or update the row
+           const result = await architectApi.postFlowsDatatableRows(tableId, row);
+           console.log('Assignment saved to data table.', result);
+           document.getElementById('selectedOutput').innerText += "\n(Saved to Data Table)";
+           const primaryName = document.getElementById('primarySelect').selectedOptions[0].text;
+            const secondaryName = document.getElementById('secondarySelect').selectedOptions[0].text;
+
+            document.getElementById('currentAssignment').innerText =  `Primary: ${primaryName} | Secondary: ${secondaryName}`;
+            document.getElementById('selectedOutput').innerText =  `✅ Assignment saved!\n`;
+
+       } catch (error) {
+           console.error('Failed to save to data table:', error);
+           console.error('Status:', error.status);
+           console.error('Message:', error.body?.message);
+           console.error('Details:', JSON.stringify(error.body?.details, null, 2));
+           alert("Error saving to Data Table. Check console for details.");
+       }
+    }
+    async function listDataTables() {
+        const architectApi = new platformClient.ArchitectApi();
+
+        try {
+            const response = await architectApi.getFlowsDatatables({ pageSize: 100 }); // fetch all
+            response.entities.forEach((table) => {
+                //console.log(`📘 Table Name: "${table.name}" — ID: ${table.id}`);
+            });
+        } catch (err) {
+            console.error("Failed to fetch data tables:", err);
+        }
+    }
+
+   authenticate();
+</script>

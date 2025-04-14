@@ -2,7 +2,105 @@
 
 <head>
     <script src='https://sdk-cdn.mypurecloud.com/javascript/27.0.0/purecloud-platform-client-v2.min.js'></script>
-</head>
+    <style>
+        body {
+          font-family: 'Segoe UI', sans-serif;
+          background-color: #f7f9fc;
+          margin: 0;
+          padding: 40px;
+          color: #333;
+        }
+      
+        h2, h3 {
+          color: #2c3e50;
+        }
+      
+        .section {
+          background: white;
+          padding: 20px 30px;
+          margin-bottom: 30px;
+          border-radius: 10px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+      
+        label {
+          margin-right: 10px;
+          font-weight: bold;
+        }
+      
+        select {
+          padding: 8px;
+          margin-right: 20px;
+          border-radius: 5px;
+          border: 1px solid #ccc;
+        }
+      
+        button {
+          background-color: #0078d4;
+          color: white;
+          border: none;
+          padding: 10px 20px;
+          font-size: 15px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: background-color 0.3s ease;
+        }
+      
+        button:hover {
+          background-color: #005ea0;
+        }
+      
+        #selectedOutput {
+          margin-top: 10px;
+          font-style: italic;
+          color: #2c3e50;
+        }
+      
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 20px;
+        }
+      
+        table, th, td {
+          border: 1px solid #ddd;
+        }
+      
+        th {
+          background-color: #f1f3f5;
+          text-align: left;
+          padding: 10px;
+        }
+      
+        td {
+          padding: 10px;
+        }
+        th {
+            background-color: #2e2e2e; /* dark gray header */
+            color: #00d4c4; /* Teal text color from your logo */
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            }
+        table {
+            background-color: #2b2b2b;
+            color: white;
+        }
+        .agent-selects {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .agent-selects label {
+            font-weight: bold;
+            color: rgb(12, 11, 11);
+        }
+
+      </style>
+ </head>
 
 <body>
     <h2>ERS Team Members</h2>
@@ -10,28 +108,29 @@
     <p id="currentAssignment">Loading current assignment...</p>
 
     <h3>Assign Primary & Secondary Agents</h3>
-   <label for="primarySelect">Primary:</label>
-   <select id="primarySelect"></select>
+    <div class="agent-selects">
+        <label for="primarySelect">Primary:</label>
+        <select id="primarySelect"></select>
 
-   <label for="secondarySelect">Secondary:</label>
-   <select id="secondarySelect"></select>
+        <label for="secondarySelect">Secondary:</label>
+        <select id="secondarySelect"></select>
+    </div>    
+    <br><br>
+    <!-- 🔘 The Button -->
+    <button onclick="getSelectedAgents()">Submit Assignment</button>
 
-   <br><br>
-   <!-- 🔘 The Button -->
-   <button onclick="getSelectedAgents()">Submit Assignment</button>
-
-   <p id="selectedOutput"></p> <!-- Optional: for showing result -->
-   <table border="1">
-       <thead>
-       <tr>
-           <th>Agent Name</th>
-           <th>Mobile Phone</th>
-           <th>Home Phone</th>
-           <th>Work Phone</th>
-       </tr>
-       </thead>
-       <tbody id="agentTableBody"></tbody>
-   </table>
+    <p id="selectedOutput"></p> <!-- Optional: for showing result -->
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Agent Name</th>
+                <th>Mobile Phone</th>
+                <th>Home Phone</th>
+                <th>Work Phone</th>
+            </tr>
+        </thead>
+        <tbody id="agentTableBody"></tbody>
+    </table>
 </body>
 </html>
 

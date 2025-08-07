@@ -344,7 +344,9 @@
         await client.loginImplicitGrant(clientId, redirectUri);
         console.log('Authenticated');
         const api = new platformClient.ArchitectApi();
-        const tableId ='1ff19aee-a309-4a86-9c81-b067ab60331c';// '2127052b-afb7-47ac-b274-467a6377c4e0'; 
+        
+        const tableId = await getDataTableIdByName(tableName);
+        console.log("Roster Table ID:", tableId)
 
         api.getFlowsDatatableRow(tableId, 'ERS').then(row => {
             console.log("Full ERS row:", row);

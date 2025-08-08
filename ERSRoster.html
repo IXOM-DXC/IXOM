@@ -119,7 +119,8 @@
     <br><br>
     <!-- 🔘 The Button -->
     <button onclick="getSelectedAgents()">Submit Assignment</button>
-
+    <div id="assignmentMessage" style="margin-top: 10px; font-weight: bold;"></div>
+    
     <p id="selectedOutput"></p> <!-- Optional: for showing result -->
     <table border="1">
         <thead>
@@ -150,6 +151,7 @@
     let cachedTableId = null; 
     const tableName = 'ERS_Roster'; // Data Table name //ERS_Agent_Assignment
     const agentIdToEmailMap = {};
+    const agentMap = {}; // id => name map
 
     client.setEnvironment(environment);
 
@@ -236,8 +238,6 @@
             }
         }
 
-
-
     async function getDataTableIdByName(tableName) {
         const architectApi = new platformClient.ArchitectApi();
         const tables = await architectApi.getFlowsDatatables({ pageSize: 100 });
@@ -246,15 +246,19 @@
         return match ? match.id : null;
     }
 
-
-
     async function getSelectedAgents() {
         const primarySelect = document.getElementById('primarySelect');
         const secondarySelect = document.getElementById('secondarySelect');
         
-
         const primaryId = primarySelect?.value;
         const secondaryId = secondarySelect?.value;
+        
+        // Check for same selection
+        if (primaryId === secondaryId) {
+           //alert("Primary and Backup agents cannot be the same.");
+            showAssignmentMessage('❌ Primary and Backup agents must be different.', true);
+            return;
+        }
 
         const primaryEmail = agentIdToEmailMap[primaryId];
         const attr = await getERSAttributesByEmail(primaryEmail);
@@ -266,56 +270,72 @@
         console.log('Selected PIN:', attr.pinEnabled);
 
         // Optional: show names
-        const primaryName = document.getElementById('primarySelect').selectedOptions[0].text;
-        const secondaryName = document.getElementById('secondarySelect').selectedOptions[0].text;
-        document.getElementById('selectedOutput').innerText = 
-            `Primary: ${primaryName} | Backup: ${secondaryName}`;
+        //const primaryName = document.getElementById('primarySelect').selectedOptions[0].text;
+        //const secondaryName = document.getElementById('secondarySelect').selectedOptions[0].text;
+
+        const primaryName = agentMap[primaryId] || `ID: ${primaryId}`;
+        const secondaryName = agentMap[secondaryId] || `ID: ${secondaryId}`;
+
+        //document.getElementById('selectedOutput').innerText = `Primary: ${primaryName} | Backup: ${secondaryName}`;
 
         saveAssignmentToDataTable(primaryId, secondaryId, attr.contactOrder, attr.pinEnabled);
+        showAssignmentMessage('✅ Assignment saved!', false);
+    }
+
+    function showAssignmentMessage(message, isError = false) {
+        const messageDiv = document.getElementById('assignmentMessage');
+        messageDiv.innerText = message;
+        messageDiv.style.color = isError ? 'red' : 'green';
+        messageDiv.style.display = 'block';
+
+        // Optional: Auto-hide after 5 seconds
+        //setTimeout(() => {
+           // messageDiv.innerText = '';
+        //}, 5000);
     }
 
     async function getFullRow(tableId, rowId) {
         const client = platformClient.ApiClient.instance;
 
         try {
-            // Ensure auth is applied manually
-            const opts = {
-                pathParams: {
-                    datatableId: tableId,
-                    rowId: rowId
-                },
-                queryParams: {
-                    showbrief: false
-                },
-                headerParams: {},
-                formParams: {},
-                bodyParam: null,
-                authNames: ['PureCloud Auth'], // FIXED HERE
-                contentTypes: [],
-                accepts: ['application/json']
-            };
+                // Ensure auth is applied manually
+                const opts = {
+                    pathParams: {
+                        datatableId: tableId,
+                        rowId: rowId
+                    },
+                    queryParams: {
+                        showbrief: false
+                    },
+                    headerParams: {},
+                    formParams: {},
+                    bodyParam: null,
+                    authNames: ['PureCloud Auth'], // FIXED HERE
+                    contentTypes: [],
+                    accepts: ['application/json']
+                };
 
-            console.log("Access Token:", client.authData.accessToken);
-                
-            const response = await client.callApi(
-                '/api/v2/flows/datatables/{datatableId}/rows/{rowId}',
-                'GET',
-                opts.pathParams,
-                opts.queryParams,
-                opts.headerParams,
-                opts.formParams,
-                opts.bodyParam,
-                opts.authNames,
-                opts.contentTypes,
-                opts.accepts
-                );
+                console.log("Access Token:", client.authData.accessToken);
+                    
+                const response = await client.callApi(
+                    '/api/v2/flows/datatables/{datatableId}/rows/{rowId}',
+                    'GET',
+                    opts.pathParams,
+                    opts.queryParams,
+                    opts.headerParams,
+                    opts.formParams,
+                    opts.bodyParam,
+                    opts.authNames,
+                    opts.contentTypes,
+                    opts.accepts
+                    );
 
-                console.log("✅ Full row response:", response);
-            return response;
-        } catch (err) {
-            console.error("Error fetching full row:", err);
-        return null;
-    }
+                    console.log("✅ Full row response:", response);
+                return response;
+            } catch (err) {
+                console.error("Error fetching full row:", err);
+            return null;
+        }
     }
 
     async function getFullRowWithFetch(tableId, rowId) {
@@ -365,7 +385,7 @@
         const groupSearch = await groupsApi.getGroups({ name: groupName });
         const raiseGroup = groupSearch.entities.find(g => g.name === groupName);
         if (!raiseGroup) {
-            alert('RAISE group not found');
+            alert('ERS group not found');
             return;
         }
         // Step 2: Get group members
@@ -381,7 +401,7 @@
         primaryDropdown.innerHTML = '';
         secondaryDropdown.innerHTML = '';
 
-        const agentMap = {}; // id => name map
+        //const agentMap = {}; // id => name map
 
         console.log(`Members in group: ${members.entities.length}`);
         // Step 3: Fetch and display each agent's contact info
@@ -411,7 +431,7 @@
             primaryDropdown.add(option1);
             secondaryDropdown.add(option2);
             
-            setupDropdownLogic();
+            //setupDropdownLogic();
 
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -432,39 +452,155 @@
             document.getElementById('primarySelect').value = assignment.primaryId;
             document.getElementById('secondarySelect').value = assignment.secondaryId;
 
-            const primaryName = agentMap[assignment.primaryId] || `ID: ${assignment.primaryId}`;
-            const secondaryName = agentMap[assignment.secondaryId] || `ID: ${assignment.secondaryId}`;
+            const primaryName = agentMap[assignment.primaryId] || '[Agent Removed from ERS Group]';
+            const secondaryName = agentMap[assignment.secondaryId] || '[Agent Removed from ERS Group]';
 
             document.getElementById('currentAssignment').innerText =
             `Primary: ${primaryName} | Backup: ${secondaryName}`;
+            // Only set dropdown values if the assigned agents are still in the current group
+            const primaryOptionExists = primarySelect.querySelector(`option[value="${assignment.primaryId}"]`);
+            const secondaryOptionExists = secondarySelect.querySelector(`option[value="${assignment.secondaryId}"]`);
+
+            if (primaryOptionExists) {
+                primarySelect.value = assignment.primaryId;
+            } else {
+                primarySelect.selectedIndex = 0; // fallback to default
+            }
+
+            if (secondaryOptionExists) {
+                secondarySelect.value = assignment.secondaryId;
+            } else {
+                secondarySelect.selectedIndex = 0; // fallback to default
+            }
         } 
         else {
             document.getElementById('currentAssignment').innerText = 'No current assignment found in Data Table.';
         }
     }
+
     function setupDropdownLogic() {
         const primarySelect = document.getElementById('primarySelect');
         const secondarySelect = document.getElementById('secondarySelect');
 
-        primarySelect.addEventListener('change', () => {
+        function updateSecondaryOptions() {
             const selectedPrimary = primarySelect.value;
             Array.from(secondarySelect.options).forEach(option => {
-            option.disabled = option.value === selectedPrimary;
+                option.disabled = false; // reset
+                if (option.value === selectedPrimary) {
+                    option.disabled = true;
+                }
             });
-        });
+        }
 
-        secondarySelect.addEventListener('change', () => {
+        function updatePrimaryOptions() {
             const selectedSecondary = secondarySelect.value;
             Array.from(primarySelect.options).forEach(option => {
-            option.disabled = option.value === selectedSecondary;
+                option.disabled = false; // reset
+                if (option.value === selectedSecondary) {
+                    option.disabled = true;
+                }
             });
-        });
+        }
 
-        // Trigger once if values are already set
-        primarySelect.dispatchEvent(new Event('change'));
-        secondarySelect.dispatchEvent(new Event('change'));
+        primarySelect.addEventListener('change', updateSecondaryOptions);
+        secondarySelect.addEventListener('change', updatePrimaryOptions);
+
+        updatePrimaryOptions();
+        updateSecondaryOptions();
     }
 
+    function populateAgentDropdowns(agentIds) {
+        const primarySelect = document.getElementById('primarySelect');
+        const secondarySelect = document.getElementById('secondarySelect');
+
+        // Clear current options
+        primarySelect.innerHTML = '';
+        secondarySelect.innerHTML = '';
+
+        // Add updated options
+        for (const agentId of agentIds) {
+            const name = agentMap[agentId];
+
+            const primaryOption = document.createElement('option');
+            primaryOption.value = agentId;
+            primaryOption.text = name;
+
+            const secondaryOption = document.createElement('option');
+            secondaryOption.value = agentId;
+            secondaryOption.text = name;
+
+            primarySelect.appendChild(primaryOption);
+            secondarySelect.appendChild(secondaryOption);
+        }
+    }
+
+    function repopulateDropdowns(agentIdToNameMap) {
+        const primarySelect = document.getElementById('primarySelect');
+        const secondarySelect = document.getElementById('secondarySelect');
+
+        // Save currently selected IDs to retain selection
+        const currentPrimary = primarySelect.value;
+        const currentSecondary = secondarySelect.value;
+
+        // Clear existing options
+        primarySelect.innerHTML = '';
+        secondarySelect.innerHTML = '';
+
+        // Populate both dropdowns again
+        for (const agentId in agentIdToNameMap) {
+            const agentName = agentIdToNameMap[agentId];
+
+            const primaryOption = document.createElement('option');
+            primaryOption.value = agentId;
+            primaryOption.textContent = agentName;
+            primarySelect.appendChild(primaryOption);
+
+            const secondaryOption = document.createElement('option');
+            secondaryOption.value = agentId;
+            secondaryOption.textContent = agentName;
+            secondarySelect.appendChild(secondaryOption);
+        }
+
+        // Restore previous selections if still valid
+        if (agentIdToNameMap[currentPrimary]) {
+            primarySelect.value = currentPrimary;
+        }
+        if (agentIdToNameMap[currentSecondary]) {
+            secondarySelect.value = currentSecondary;
+        }
+        // Remove same selection in both
+        //preventDuplicateSelection();
+
+        //primarySelect.addEventListener('change', preventDuplicateSelection);
+        //secondarySelect.addEventListener('change', preventDuplicateSelection);
+    }
+    
+    function preventDuplicateSelection() {
+        const primarySelect = document.getElementById('primarySelect');
+        const secondarySelect = document.getElementById('secondarySelect');
+
+        // Re-enable all options
+        Array.from(primarySelect.options).forEach(option => option.disabled = false);
+        Array.from(secondarySelect.options).forEach(option => option.disabled = false);
+
+        const primaryValue = primarySelect.value;
+        const secondaryValue = secondarySelect.value;
+
+        if (primaryValue && secondaryValue && primaryValue === secondaryValue) {
+            alert("Primary and Backup agents cannot be the same.");
+            secondarySelect.value = '';
+        }
+
+        // Disable selected primary in secondary
+        Array.from(secondarySelect.options).forEach(option => {
+            option.disabled = (option.value === primaryValue);
+        });
+
+        // Disable selected secondary in primary
+        Array.from(primarySelect.options).forEach(option => {
+            option.disabled = (option.value === secondaryValue);
+        });
+    }
    
     async function getTableIdByName(tableName) {
        if (cachedTableId) {
@@ -523,18 +659,20 @@
        console.log('Sending row:', JSON.stringify(row, null, 2));
 
        try {
-           await architectApi.deleteFlowsDatatableRow(tableId, "ERS");
-           // Save or update the row
-           const result = await architectApi.postFlowsDatatableRows(tableId, row);
-           console.log('Assignment saved to data table.', result);
-           document.getElementById('selectedOutput').innerText += "\n(Saved to Data Table)";
-           const primaryName = document.getElementById('primarySelect').selectedOptions[0].text;
+            await architectApi.deleteFlowsDatatableRow(tableId, "ERS");
+            // Save or update the row
+            const result = await architectApi.postFlowsDatatableRows(tableId, row);
+            console.log('Assignment saved to data table.', result);
+            
+            //document.getElementById('selectedOutput').innerText += "\n(Saved to Data Table)";
+            const primaryName = document.getElementById('primarySelect').selectedOptions[0].text;
             const secondaryName = document.getElementById('secondarySelect').selectedOptions[0].text;
 
             document.getElementById('currentAssignment').innerText =  `Primary: ${primaryName} | Secondary: ${secondaryName}`;
-            document.getElementById('selectedOutput').innerText =  `✅ Assignment saved!\n`;
-
-       } catch (error) {
+            //document.getElementById('selectedOutput').innerText =  `✅ Assignment saved!\n`;
+            
+            repopulateDropdowns(agentMap);  // <-- refresh the dropdowns when saving
+        } catch (error) {
            console.error('Failed to save to data table:', error);
            console.error('Status:', error.status);
            console.error('Message:', error.body?.message);
@@ -555,5 +693,5 @@
         }
     }
 
-   authenticate();
+   authenticate(); // This will be executed as the first step
 </script>

@@ -146,39 +146,15 @@
     // Set Genesys Cloud objects
     const platformClient = require('platformClient');
     const client = platformClient.ApiClient.instance;
-    const groupName = 'ERS';
+    const groupName = 'AU ERS Team'; //'ERS';
     let organizationApi = new platformClient.OrganizationApi();
     let cachedTableId = null; 
-    const tableName = 'ERS_Roster'; // Data Table name //ERS_Agent_Assignment
+    const tableName = 'ERS_Roster'; //ERS_Agent_Assignment
     const agentIdToEmailMap = {};
     const agentMap = {}; // id => name map
 
     client.setEnvironment(environment);
 
-    //document.addEventListener('DOMContentLoaded', function () {
-     //   client.loginImplicitGrant(clientId, redirectUri)
-     //       .then(() => {
-     //           organizationApi.getOrganizationsMe()
-    //                .then((data) => {
-    //                    populateParagraph(data)
-    //                })
-   //                 .catch((err) => {
-     //                   console.log('There was a failure calling getOrganizationsMe');
-     //                   console.error(err);
-     //               });
-    //        })
-    //});
-
-    
-    function populateParagraph(data) {
-        for (key in data) {
-            console.log(key, data[key]);
-            let textnode = document.createTextNode(key + ' : ' + data[key]);
-            let br = document.createElement("br")
-            document.getElementById("orgDetails").appendChild(textnode);
-            document.getElementById("orgDetails").appendChild(br);
-        }
-    }
     async function getCurrentAssignment(tableId) {
         try {
             console.log("Executing getFullRow...............");
@@ -219,7 +195,7 @@
                     console.warn(`No matching row found for email: ${email}`);
                     return {
                         contactOrder: 'Not Set',
-                        pinEnabled: 'Not Set'
+                        pinEnabled: 'Not Set',
                     };
                 }
 
@@ -227,13 +203,19 @@
 
                 return {
                     contactOrder: row.ContactOrder || 'Not Set',
-                    pinEnabled: row.PinEnabled != null ? row.PinEnabled : 'Not Set'
+                    pinEnabled: row.PinEnabled != null ? row.PinEnabled : 'Not Set',
+                    mobile:row.MobilePhone || 'Not set',
+                    home:row.HomePhone || 'Not Set',
+                    work:row.WorkPhone || 'Not Set'
                 };
             } catch (err) {
                 console.error(`Failed to get attributes for ${email}:`, err);
                 return {
                     contactOrder: 'Not Set',
-                    pinEnabled: 'Not Set'
+                    pinEnabled: 'Not Set',
+                    mobile:row.MobilePhone || 'Not set',
+                    home:row.HomePhone || 'Not Set',
+                    work:row.WorkPhone || 'Not Set'
                 };
             }
         }
@@ -268,6 +250,9 @@
         console.log('Selected Secondary:', secondaryId);
         console.log('Selected Contact order:', attr.contactOrder);        
         console.log('Selected PIN:', attr.pinEnabled);
+        console.log('Selected MobilePhone:', attr.mobile);
+        console.log('Selected HomePhone:', attr.home);
+        console.log('Selected WorkPhone:', attr.work);
 
         // Optional: show names
         //const primaryName = document.getElementById('primarySelect').selectedOptions[0].text;
@@ -410,20 +395,20 @@
             agentMap[user.id] = user.name;
             agentIdToEmailMap[user.id] = user.email;
 
-            const cell = user.addresses?.find(a => a.type === 'MOBILE' && a.mediaType === 'PHONE')?.address || '';
-            const home = user.addresses?.find(a => a.type === 'HOME' && a.mediaType === 'PHONE')?.address || '';
-            const work = user.addresses?.find(a => a.type === 'WORK' && a.mediaType === 'PHONE')?.address || '';
+            //const mobile = user.addresses?.find(a => a.type === 'MOBILE' && a.mediaType === 'PHONE')?.address || '';
+            //const home = user.addresses?.find(a => a.type === 'HOME' && a.mediaType === 'PHONE')?.address || '';
+            //const work = user.addresses?.find(a => a.type === 'WORK' && a.mediaType === 'PHONE')?.address || '';
 
             // Get ERS attributes from Data Table using user.email
              console.log('Email:', user.email);
             const ersParams = await getERSAttributesByEmail(user.email);
             const contactOrder = ersParams.contactOrder;
             const enablePin = ersParams.pinEnabled;
+            const mobile = ersParams.mobile;
+            const home = ersParams.home;
+            const work = ersParams.work;
 
-            console.log(`Agent: ${user.name}, Contact Order: ${ersParams.contactOrder}, PIN Enabled: ${ersParams.pinEnabled}`);
-            console.log('Work Phone:', work);
-            console.log('Mobile Phone:', cell);
-            console.log('Home Phone:', home);
+            console.log(`Agent: ${user.name}, Contact Order: ${ersParams.contactOrder}, PIN Enabled: ${ersParams.pinEnabled}, Mobile Phone: ${ersParams.mobile}, Home Phone: ${ersParams.home}, Work Phone: ${ersParams.work}`);
 
             // Add agent to dropdowns
             const option1 = new Option(user.name, user.id);
@@ -436,7 +421,7 @@
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${user.name}</td>
-                <td>${cell}</td>
+                <td>${mobile}</td>
                 <td>${home}</td>
                 <td>${work}</td>
                 <td>${contactOrder}</td>
